@@ -12,3 +12,7 @@ regex
 sentencepiece
 # For XLM
 sacremoses
+
+tensorboardX
+scipy
+sklearn
