@@ -245,8 +245,10 @@ def evaluate(args, model, tokenizer, prefix=""):
         labels_file = os.path.join(eval_output_dir, "eval_labels.tsv")
         with open(labels_file, "w") as tsv_file:
             writer = csv.writer(tsv_file, delimiter='\t')
-            for index, pred_label in enumerate(preds):
-                writer.writerow([index, pred_label, out_label_ids])
+            for index, pred_labels in enumerate(preds):
+                out_labels = out_label_ids[index]
+                for sub_index, pred_label in enumerate(pred_labels):
+                    writer.writerow([pred_label, out_labels[sub_index]])
 
         with open(output_eval_file, "w") as writer:
             logger.info("***** Eval results {} *****".format(prefix))
