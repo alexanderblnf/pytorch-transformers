@@ -381,7 +381,12 @@ def main():
                         help="For distributed training: local_rank")
     parser.add_argument('--server_ip', type=str, default='', help="For distant debugging.")
     parser.add_argument('--server_port', type=str, default='', help="For distant debugging.")
+    parser.add_argument('--gpu_id', help='gpu_id: Specifies which gpu to use by id')
     args = parser.parse_args()
+
+    gpu_id = args.gpu_id
+    if gpu_id is not None and gpu_id.isdigit():
+        os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
 
     if os.path.exists(args.output_dir) and os.listdir(args.output_dir) and args.do_train and not args.overwrite_output_dir:
         raise ValueError("Output directory ({}) already exists and is not empty. Use --overwrite_output_dir to overcome.".format(args.output_dir))
