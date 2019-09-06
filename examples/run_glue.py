@@ -22,6 +22,7 @@ import glob
 import logging
 import os
 import random
+import csv
 
 import numpy as np
 import torch
@@ -241,6 +242,12 @@ def evaluate(args, model, tokenizer, prefix=""):
         results.update(result)
 
         output_eval_file = os.path.join(eval_output_dir, "eval_results.txt")
+        labels_file = os.path.join(eval_output_dir, "eval_labels.tsv")
+        with open(labels_file, "w") as tsv_file:
+            writer = csv.writer(tsv_file, delimiter='\t', newline='\n')
+            for index, pred_label in enumerate(preds):
+                writer.writerow([index, pred_label, out_label_ids])
+
         with open(output_eval_file, "w") as writer:
             logger.info("***** Eval results {} *****".format(prefix))
             for key in sorted(result.keys()):
