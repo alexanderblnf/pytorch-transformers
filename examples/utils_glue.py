@@ -21,6 +21,9 @@ import csv
 import logging
 import os
 import sys
+import random
+import numpy as np
+import math
 from io import open
 
 from scipy.stats import pearsonr, spearmanr
@@ -417,6 +420,59 @@ class MantisIntentProcessor(DataProcessor):
         return examples
 
 
+class MantisWebProcessor(DataProcessor):
+    """Processor for the MANtiS data set."""
+
+    def get_train_examples(self, data_dir):
+        """See base class."""
+        logger.info("LOOKING AT {}".format(os.path.join(data_dir, "train.tsv")))
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "train.tsv")), "train")
+
+    def get_dev_examples(self, data_dir):
+        """See base class."""
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "valid.tsv")), "dev")
+
+    def get_test_examples(self, data_dir):
+        """See base class."""
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "test.tsv")), "test")
+
+    def get_labels(self):
+        """See base class."""
+        return ["0", "1"]
+
+    def _create_examples(self, lines, set_type):
+        """Creates examples for the training and dev sets."""
+        if set_type == "train":
+            examples = []
+            query_neg_count = 0
+            for (i, line) in enumerate(lines):
+                guid = "%s-%s" % (set_type, i)
+                text_a = ' '.join(line[1:-1])  # query
+                text_b = line[-1][0:-2]
+                label = line[0]
+                if label == '1':
+                    query_neg_count = 0
+                else:
+                    query_neg_count += 1
+
+                if query_neg_count <= 1:
+                    examples.append(
+                        InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
+        else:
+            examples = []
+            for (i, line) in enumerate(lines):
+                guid = "%s-%s" % (set_type, i)
+                text_a = ' '.join(line[1:-1])  # query
+                text_b = line[-1][0:-2]
+                label = line[0]
+                examples.append(
+                    InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
+        return examples
+
+
 def convert_examples_to_features(examples, label_list, max_seq_length,
                                  tokenizer, output_mode,
                                  cls_token_at_end=False,
@@ -582,6 +638,123 @@ def pearson_and_spearman(preds, labels):
     }
 
 
+def _to_list(x):
+    if isinstance(x, list):
+        return x
+    return [x]
+
+
+def ap(y_true, y_pred, rel_threshold=0):
+    s = 0.
+    y_true = _to_list(np.squeeze(y_true).tolist())
+    y_pred = _to_list(np.squeeze(y_pred).tolist())
+    c = [a for a in zip(y_true, y_pred)]
+    random.shuffle(c)
+    c = sorted(c, key=lambda x:x[1], reverse=True)
+    ipos = 0
+    for j, (g, p) in enumerate(c):
+        if g > rel_threshold:
+            ipos += 1.
+            s += ipos / ( j + 1.)
+    if ipos == 0:
+        s = 0.
+    else:
+        s /= ipos
+    return s
+
+
+def mean_average_precision(preds, labels):
+    aps = []
+    query_preds = []
+    query_labels = []
+    i = 0
+    for l, p in zip(labels, preds):
+        if l == 1 and i != 0:
+            aps.append(ap(query_labels, query_preds))
+            query_preds=[]
+            query_labels=[]
+
+        query_preds.append(p)
+        query_labels.append(l)
+
+        i += 1
+
+        if i == len(preds):
+            aps.append(ap(query_labels, query_preds))
+    return sum(aps)/float(len(aps))
+
+
+def compute_aps(preds, labels):
+    aps = []
+    query_preds = []
+    query_labels = []
+    i=0
+    for l,p in zip(labels, preds):
+        if (l == 1 and i !=0):
+            aps.append(ap(query_labels, query_preds))
+            query_preds=[]
+            query_labels=[]
+
+        query_preds.append(p)
+        query_labels.append(l)
+
+        i+=1
+
+        if(i==len(preds)):
+            aps.append(ap(query_labels, query_preds))
+    return aps
+
+
+def ndcg(y_true, y_pred, rel_threshold=0., k=10):
+    if k <= 0.:
+        return 0.
+    s = 0.
+    y_true = _to_list(np.squeeze(y_true).tolist())
+    y_pred = _to_list(np.squeeze(y_pred).tolist())
+    c = [v for v in zip(y_true, y_pred)]
+    random.shuffle(c)
+    c_g = sorted(c, key=lambda x:x[0], reverse=True)
+    c_p = sorted(c, key=lambda x:x[1], reverse=True)
+    idcg = 0.
+    ndcg_val = 0.
+    for i, (g,p) in enumerate(c_g):
+        if i >= k:
+            break
+        if g > rel_threshold:
+            idcg += (math.pow(2., g) - 1.) / math.log(2. + i)
+    for i, (g,p) in enumerate(c_p):
+        if i >= k:
+            break
+        if g > rel_threshold:
+            ndcg_val += (math.pow(2., g) - 1.) / math.log(2. + i)
+    if idcg == 0.:
+        return 0.
+    else:
+        return ndcg_val / idcg
+
+
+def ndcg_at_10(preds, labels):
+    ndcgs = []
+    query_preds = []
+    query_labels = []
+    i = 0
+    # ndcg_at_10 = ndcg(k=10)
+    for l, p in zip(labels, preds):
+        if l == 1 and i != 0:
+            ndcgs.append(ndcg(query_labels, query_preds))
+            query_preds = []
+            query_labels = []
+
+        query_preds.append(p)
+        query_labels.append(l)
+
+        i += 1
+
+        if i == len(preds):
+            ndcgs.append(ndcg(query_labels, query_preds))
+    return sum(ndcgs)/float(len(ndcgs))
+
+
 def compute_metrics(task_name, preds, labels):
     assert len(preds) == len(labels)
     if task_name == "cola":
@@ -606,6 +779,8 @@ def compute_metrics(task_name, preds, labels):
         return {"acc": simple_accuracy(preds, labels)}
     elif task_name == "mantis_intent":
         return {"acc": simple_accuracy(preds, labels)}
+    elif task_name == 'mantis_web':
+        return {"map": mean_average_precision(preds, labels), "ndcg": ndcg_at_10(preds, labels)}
     else:
         raise KeyError(task_name)
 
@@ -622,6 +797,7 @@ processors = {
     "rte": RteProcessor,
     "wnli": WnliProcessor,
     "mantis_intent": MantisIntentProcessor,
+    "mantis_web": MantisWebProcessor,
 }
 
 output_modes = {
@@ -636,6 +812,7 @@ output_modes = {
     "rte": "classification",
     "wnli": "classification",
     "mantis_intent": "classification",
+    "mantis_web": "classification",
 }
 
 GLUE_TASKS_NUM_LABELS = {
@@ -649,4 +826,5 @@ GLUE_TASKS_NUM_LABELS = {
     "rte": 2,
     "wnli": 2,
     "mantis_intent": 48,
+    "mantis_web": 2,
 }
