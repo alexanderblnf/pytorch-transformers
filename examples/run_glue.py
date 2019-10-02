@@ -235,7 +235,7 @@ def evaluate(args, model, tokenizer, prefix=""):
                 out_label_ids = np.append(out_label_ids, inputs['labels'].detach().cpu().numpy(), axis=0)
 
         eval_loss = eval_loss / nb_eval_steps
-        if args.task_name == "mantis_web":
+        if args.task_name == "mantis_web" or args.task_name == "mantis_easy":
             preds = softmax(preds, axis=1)
             preds = preds[:, 1]
         elif args.output_mode == "classification":

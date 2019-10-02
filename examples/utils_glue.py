@@ -472,6 +472,57 @@ class MantisWebProcessor(DataProcessor):
                     InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
         return examples
 
+class MantisEasyProcessor(DataProcessor):
+    """Processor for the MANtiS Easy data set."""
+
+    def get_train_examples(self, data_dir):
+        """See base class."""
+        logger.info("LOOKING AT {}".format(os.path.join(data_dir, "train.tsv")))
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "train.tsv")), "train")
+
+    def get_dev_examples(self, data_dir):
+        """See base class."""
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "valid.tsv")), "dev")
+
+    def get_test_examples(self, data_dir):
+        """See base class."""
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "test.tsv")), "test")
+
+    def get_labels(self):
+        """See base class."""
+        return ["0", "1"]
+
+    def _create_examples(self, lines, set_type):
+        """Creates examples for the training and dev sets."""
+        if set_type == "train":
+            examples = []
+            query_neg_count = 0
+            for (i, line) in enumerate(lines):
+                guid = "%s-%s" % (set_type, i)
+                text_a = ' '.join(line[1:-1])  # query
+                text_b = line[-1][0:-2]
+                label = line[0]
+                if label == '1':
+                    query_neg_count = 0
+                else:
+                    query_neg_count += 1
+
+                if query_neg_count <= 1:
+                    examples.append(
+                        InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
+        else:
+            examples = []
+            for (i, line) in enumerate(lines):
+                guid = "%s-%s" % (set_type, i)
+                text_a = ' '.join(line[1:-1])  # query
+                text_b = line[-1][0:-2]
+                label = line[0]
+                examples.append(
+                    InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
+        return examples
 
 def convert_examples_to_features(examples, label_list, max_seq_length,
                                  tokenizer, output_mode,
@@ -781,6 +832,8 @@ def compute_metrics(task_name, preds, labels):
         return {"acc": simple_accuracy(preds, labels)}
     elif task_name == 'mantis_web':
         return {"map": mean_average_precision(preds, labels), "ndcg": ndcg_at_10(preds, labels)}
+    elif task_name == 'mantis_easy':
+        return {"map": mean_average_precision(preds, labels), "ndcg": ndcg_at_10(preds, labels)}
     else:
         raise KeyError(task_name)
 
@@ -798,6 +851,7 @@ processors = {
     "wnli": WnliProcessor,
     "mantis_intent": MantisIntentProcessor,
     "mantis_web": MantisWebProcessor,
+    "mantis_easy": MantisEasyProcessor,
 }
 
 output_modes = {
@@ -813,6 +867,7 @@ output_modes = {
     "wnli": "classification",
     "mantis_intent": "classification",
     "mantis_web": "classification",
+    "mantis_easy": "classification",
 }
 
 GLUE_TASKS_NUM_LABELS = {
@@ -827,4 +882,5 @@ GLUE_TASKS_NUM_LABELS = {
     "wnli": 2,
     "mantis_intent": 48,
     "mantis_web": 2,
+    "mantis_easy": 2,
 }
