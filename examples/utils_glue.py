@@ -420,6 +420,31 @@ class MantisIntentProcessor(DataProcessor):
         return examples
 
 
+class MantisMultiLabelIntentProcessor(DataProcessor):
+    def get_train_examples(self, data_dir):
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "train_encoded.tsv")), "train")
+
+    def get_dev_examples(self, data_dir):
+        """See base class."""
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "dev_encoded.tsv")), "dev")
+
+    def get_labels(self):
+        """See base class."""
+        return ['GG', 'OQ', 'PA', 'FD', 'IR', 'O', 'FQ', 'PF', 'NF']
+
+    def _create_examples(self, lines, set_type):
+        """Creates examples for the training and dev sets."""
+        examples = []
+        for (i, line) in enumerate(lines):
+            guid = "%s-%s" % (set_type, i)
+            text_a = '.'.join(line[1:-1])
+            label = line[0].split(',')
+            examples.append(
+                InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
+        return examples
+
 class MantisWebProcessor(DataProcessor):
     """Processor for the MANtiS data set."""
 
@@ -623,12 +648,17 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
         assert len(input_mask) == max_seq_length
         assert len(segment_ids) == max_seq_length
 
-        if output_mode == "classification":
-            label_id = label_map[example.label]
-        elif output_mode == "regression":
-            label_id = float(example.label)
+        if isinstance(example.label, list):
+            label_id = []
+            for label in example.label:
+                label_id.append(float(label))
         else:
-            raise KeyError(output_mode)
+            if output_mode == "classification":
+                label_id = label_map[example.label]
+            elif output_mode == "regression":
+                label_id = float(example.label)
+            else:
+                raise KeyError(output_mode)
 
         if ex_index < 5:
             logger.info("*** Example ***")
@@ -638,7 +668,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
             logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
             logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
             logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-            logger.info("label: %s (id = %d)" % (example.label, label_id))
+            # logger.info("label: %s (id = %d)" % (example.label, ','.join([str(label) for label in label_id]) if isinstance(label_id, list) else label_id))
 
         features.append(
                 InputFeatures(input_ids=input_ids,
@@ -830,6 +860,8 @@ def compute_metrics(task_name, preds, labels):
         return {"acc": simple_accuracy(preds, labels)}
     elif task_name == "mantis_intent":
         return {"acc": simple_accuracy(preds, labels)}
+    elif task_name == "mantis_multilabe_intent":
+        return {"acc": simple_accuracy(preds, labels)}
     elif task_name == 'mantis_web':
         return {"map": mean_average_precision(preds, labels), "ndcg": ndcg_at_10(preds, labels)}
     elif task_name == 'mantis_easy':
@@ -852,6 +884,7 @@ processors = {
     "rte": RteProcessor,
     "wnli": WnliProcessor,
     "mantis_intent": MantisIntentProcessor,
+    "mantis_multilabel_intent": MantisMultiLabelIntentProcessor,
     "mantis_web": MantisWebProcessor,
     "mantis_easy": MantisEasyProcessor,
     "mantis_web_50": MantisWebProcessor,
@@ -869,6 +902,7 @@ output_modes = {
     "rte": "classification",
     "wnli": "classification",
     "mantis_intent": "classification",
+    "mantis_multilabel_intent": "regression",
     "mantis_web": "classification",
     "mantis_easy": "classification",
     "mantis_web_50": "classification",
@@ -885,6 +919,7 @@ GLUE_TASKS_NUM_LABELS = {
     "rte": 2,
     "wnli": 2,
     "mantis_intent": 48,
+    "mantis_multilabel_intent": 9,
     "mantis_web": 2,
     "mantis_easy": 2,
     "mantis_web_50": 2,
