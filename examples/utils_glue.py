@@ -836,6 +836,8 @@ def compute_metrics(task_name, preds, labels):
         return {"map": mean_average_precision(preds, labels), "ndcg": ndcg_at_10(preds, labels)}
     elif task_name == 'mantis_web_50':
         return {"map": mean_average_precision(preds, labels), "ndcg": ndcg_at_10(preds, labels)}
+    elif task_name == 'mantis_50':
+        return {"map": mean_average_precision(preds, labels), "ndcg": ndcg_at_10(preds, labels)}
     else:
         raise KeyError(task_name)
 
@@ -855,6 +857,7 @@ processors = {
     "mantis_web": MantisWebProcessor,
     "mantis_easy": MantisEasyProcessor,
     "mantis_web_50": MantisWebProcessor,
+    "mantis_50": MantisEasyProcessor,
 }
 
 output_modes = {
@@ -872,6 +875,7 @@ output_modes = {
     "mantis_web": "classification",
     "mantis_easy": "classification",
     "mantis_web_50": "classification",
+    "mantis_50": "classification",
 }
 
 GLUE_TASKS_NUM_LABELS = {
@@ -888,4 +892,5 @@ GLUE_TASKS_NUM_LABELS = {
     "mantis_web": 2,
     "mantis_easy": 2,
     "mantis_web_50": 2,
+    "mantis_50": 2,
 }
