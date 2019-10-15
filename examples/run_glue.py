@@ -403,7 +403,7 @@ def main():
     args = parser.parse_args()
 
     gpu_id = args.gpu_id
-    if gpu_id is not None and gpu_id.isdigit():
+    if gpu_id is not None:
         os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
 
     if os.path.exists(args.output_dir) and os.listdir(args.output_dir) and args.do_train and not args.overwrite_output_dir:
